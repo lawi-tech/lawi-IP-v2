@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { Printer, AlertTriangle, Info, Mail, X } from "lucide-react";
+import { Printer, AlertTriangle, Info } from "lucide-react";
 import { EUR_TO_USD, EUR_RATE_DATE, type ComputedLine } from "@/data/pricing";
 
 interface Props {
   lines: ComputedLine[];
   generatedAt: Date;
+  // Lead data passed from parent after gate
+  company: string;
+  email: string;
 }
 
 const fmt = (n: number) =>
@@ -13,16 +16,9 @@ const fmt = (n: number) =>
 const fmtRound = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-export function StepResult({ lines, generatedAt }: Props) {
-  const [showModal, setShowModal]   = useState(false);
-  const [company, setCompany]       = useState("");
-  const [email, setEmail]           = useState("");
-  const [submitted, setSubmitted]   = useState(false);
-  const [clientName, setClientName] = useState("");
-
+export function StepResult({ lines, generatedAt, company, email }: Props) {
   const totalLawi     = lines.reduce((s, l) => s + l.lawiTotal, 0);
   const totalOfficial = lines.reduce((s, l) => s + l.officialTotal, 0);
-  const totalFiling   = lines.reduce((s, l) => s + l.filingTotal, 0);
   const totalGranted  = lines.reduce((s, l) => s + l.grantedFee, 0);
   const grandTotal    = lines.reduce((s, l) => s + l.grandTotal, 0);
 
@@ -30,72 +26,23 @@ export function StepResult({ lines, generatedAt }: Props) {
   const hasEurJurisdictions = lines.some((l) => l.jurisdiction.currency === "EUR");
   const jurisdictionCount   = new Set(lines.map((l) => l.jurisdiction.id)).size;
 
-  const handleExport = () => { if (!submitted) { setShowModal(true); return; } window.print(); };
-
-  const handleSubmit = () => {
-    if (!company.trim() || !email.trim()) return;
-    setClientName(company.trim());
-    setSubmitted(true);
-    setShowModal(false);
-    setTimeout(() => window.print(), 300);
-  };
-
   return (
     <div className="print-compact">
-
-      {/* Export modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 no-print">
-          <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-2xl">
-            <button onClick={() => setShowModal(false)} className="absolute right-4 top-4 rounded-lg p-1 text-muted-foreground hover:bg-secondary">
-              <X className="size-4" />
-            </button>
-            <div className="mb-1 flex items-center gap-2">
-              <Mail className="size-5 text-primary" />
-              <h3 className="text-base font-semibold text-foreground">Export your estimate</h3>
-            </div>
-            <p className="mb-5 text-sm text-muted-foreground">
-              We'll generate a personalized report with your company name. Your email helps us follow up if needed.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company / brand name</label>
-                <input type="text" placeholder="e.g. Acme Corp" value={company} onChange={(e) => setCompany(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Email address</label>
-                <input type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()} />
-              </div>
-            </div>
-            <button onClick={handleSubmit} disabled={!company.trim() || !email.trim()}
-              className="mt-5 w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary-glow disabled:cursor-not-allowed disabled:opacity-40">
-              Generate & export
-            </button>
-            <p className="mt-3 text-center text-[11px] text-muted-foreground">Your data is used only to personalize this report and will not be shared.</p>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          {submitted && clientName ? (
-            <>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">Trademark Cost Estimate</div>
-              <h2 className="text-2xl font-bold text-foreground">{clientName}</h2>
-            </>
-          ) : (
-            <h2 className="text-2xl font-bold text-foreground">Your estimate</h2>
-          )}
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
+            Trademark Cost Estimate
+          </div>
+          <h2 className="text-2xl font-bold text-foreground">{company}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Generated on {generatedAt.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
           </p>
         </div>
-        <button onClick={handleExport}
-          className="no-print inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-elegant)] transition-all hover:bg-primary-glow">
+        <button
+          onClick={() => window.print()}
+          className="no-print inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-elegant)] transition-all hover:bg-primary-glow"
+        >
           <Printer className="size-4" />
           Export summary
         </button>
@@ -110,7 +57,6 @@ export function StepResult({ lines, generatedAt }: Props) {
           {/* Per jurisdiction breakdown */}
           {lines.map((l, i) => (
             <div key={i} className="print-avoid-break mb-6">
-              {/* Jurisdiction header */}
               <div className="mb-2 flex items-center gap-2">
                 <span className="text-xl">{l.jurisdiction.flag}</span>
                 <div>
@@ -121,7 +67,6 @@ export function StepResult({ lines, generatedAt }: Props) {
               </div>
 
               {l.isDetailed && l.selectedServices && l.selectedServices.length > 0 ? (
-                // Detailed table (BR / AR)
                 <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
                   <table className="w-full text-sm">
                     <thead className="bg-secondary text-xs uppercase tracking-wider text-muted-foreground">
@@ -141,9 +86,9 @@ export function StepResult({ lines, generatedAt }: Props) {
                             {s.service.description}
                             {s.entityType && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">{s.entityType}</span>}
                           </td>
-                          <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{s.lawiFee === 0 ? <span className="text-xs text-green-600 font-semibold">Free</span> : fmt(s.lawiFee)}</td>
+                          <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{s.lawiFee === 0 ? <span className="text-xs font-semibold text-green-600">Free</span> : fmt(s.lawiFee)}</td>
                           <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{s.officialFee === 0 ? "—" : fmt(s.officialFee)}</td>
-                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-foreground">{s.total === 0 ? <span className="text-xs text-green-600 font-semibold">Free</span> : fmt(s.total)}</td>
+                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-foreground">{s.total === 0 ? <span className="text-xs font-semibold text-green-600">Free</span> : fmt(s.total)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -159,10 +104,9 @@ export function StepResult({ lines, generatedAt }: Props) {
                 </div>
               ) : l.isDetailed ? (
                 <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                  No services selected for {l.jurisdiction.name}. Go back to Step 2 to add services.
+                  No services selected for {l.jurisdiction.name}.
                 </div>
               ) : (
-                // Standard row
                 <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
                   <table className="w-full text-sm">
                     <thead className="bg-secondary text-xs uppercase tracking-wider text-muted-foreground">
@@ -191,7 +135,7 @@ export function StepResult({ lines, generatedAt }: Props) {
             </div>
           ))}
 
-          {/* Grand total summary + card */}
+          {/* Grand total */}
           <div className="mt-6 grid gap-4 lg:grid-cols-3 print:grid-cols-3">
             <div className="print-avoid-break lg:col-span-2 print:col-span-2 rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">Fee summary</h3>
@@ -216,12 +160,12 @@ export function StepResult({ lines, generatedAt }: Props) {
                 </div>
               </dl>
               <div className="mt-4 rounded-lg bg-accent-soft px-3 py-2 text-xs text-foreground">
-                <strong>Not included:</strong> Translation, notarization, apostille, and POA registration costs (where applicable) are itemized separately in the formal proposal.
+                <strong>Not included:</strong> Translation, notarization, apostille, and POA registration costs are itemized separately in the formal proposal.
               </div>
               {hasEurJurisdictions && (
                 <div className="mt-2 flex items-start gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                   <Info className="mt-0.5 size-3.5 shrink-0" />
-                  <span>European fees originally quoted in EUR, converted at <strong>1 EUR = {EUR_TO_USD} USD</strong> ({EUR_RATE_DATE}). The formal proposal will reflect the rate at invoicing.</span>
+                  <span>European fees converted at <strong>1 EUR = {EUR_TO_USD} USD</strong> ({EUR_RATE_DATE}). The formal proposal will reflect the rate at invoicing.</span>
                 </div>
               )}
             </div>
