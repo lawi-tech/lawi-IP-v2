@@ -4,27 +4,23 @@ import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { LawiLogo } from "@/components/lawi/Logo";
 import { Stepper } from "@/components/lawi/Stepper";
 import { StepJurisdictions } from "@/components/lawi/StepJurisdictions";
-import { StepClasses, type ClassesState } from "@/components/lawi/StepClasses";
+import { StepClasses, type ClassesState, type DetailedState } from "@/components/lawi/StepClasses";
 import { StepResult } from "@/components/lawi/StepResult";
-import { computeLine, type JurisdictionId } from "@/data/pricing";
+import { computeLine, computeDetailedLine, isDetailed, type JurisdictionId } from "@/data/pricing";
 
-export const Route = createFileRoute("/")(({
+export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
       { title: "Lawi — Trademark Cost Simulator" },
-      {
-        name: "description",
-        content:
-          "Estimate trademark registration costs across global jurisdictions with Lawi's international IP team.",
-      },
+      { name: "description", content: "Estimate trademark registration costs across global jurisdictions with Lawi's international IP team." },
     ],
   }),
-}));
+});
 
 const STEPS = [
   { label: "Jurisdictions", sub: "Where to protect" },
-  { label: "Classes",       sub: "Scope per country" },
+  { label: "Services",      sub: "Select & configure" },
   { label: "Result",        sub: "Your estimate" },
 ];
 
@@ -32,23 +28,28 @@ function Index() {
   const [step, setStep]                   = useState(0);
   const [jurisdictions, setJurisdictions] = useState<JurisdictionId[]>([]);
   const [classes, setClasses]             = useState<ClassesState>({} as ClassesState);
+  const [detailed, setDetailed]           = useState<DetailedState>({} as DetailedState);
   const [generatedAt, setGeneratedAt]     = useState<Date>(new Date());
 
   const toggleJurisdiction = (id: JurisdictionId) => {
     setJurisdictions((prev) => {
       const isRemoving = prev.includes(id);
       const next = isRemoving ? prev.filter((x) => x !== id) : [...prev, id];
-      if (!isRemoving) {
+      if (!isRemoving && !isDetailed(id)) {
         setClasses((c) => ({ ...c, [id]: 1 }));
       }
       return next;
     });
   };
 
-  const lines = useMemo(
-    () => jurisdictions.map((id) => computeLine(id, classes[id] ?? 1)),
-    [jurisdictions, classes],
-  );
+  const lines = useMemo(() => {
+    return jurisdictions.map((id) => {
+      if (isDetailed(id)) {
+        return computeDetailedLine(id, detailed[id] ?? []);
+      }
+      return computeLine(id, classes[id] ?? 1);
+    });
+  }, [jurisdictions, classes, detailed]);
 
   const canNext =
     (step === 0 && jurisdictions.length > 0) ||
@@ -63,6 +64,7 @@ function Index() {
     setStep(0);
     setJurisdictions([]);
     setClasses({} as ClassesState);
+    setDetailed({} as DetailedState);
   };
 
   return (
@@ -89,7 +91,7 @@ function Index() {
           </h1>
           <p className="mt-3 text-base text-muted-foreground">
             A guided simulator powered by Lawi's international IP team. Select your target jurisdictions,
-            configure the number of Nice classes, and get a transparent estimate in under a minute.
+            configure your services, and get a transparent estimate in under a minute.
           </p>
         </div>
 
@@ -102,7 +104,13 @@ function Index() {
             <StepJurisdictions selected={jurisdictions} onToggle={toggleJurisdiction} />
           )}
           {step === 1 && (
-            <StepClasses jurisdictions={jurisdictions} classes={classes} onChange={setClasses} />
+            <StepClasses
+              jurisdictions={jurisdictions}
+              classes={classes}
+              onChangeClasses={setClasses}
+              detailed={detailed}
+              onChangeDetailed={setDetailed}
+            />
           )}
           {step === 2 && (
             <StepResult lines={lines} generatedAt={generatedAt} />
